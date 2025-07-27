@@ -1,0 +1,22 @@
+version: '3.8'
+
+services:
+  flask:
+    build: .
+    container_name: flask_chatbot
+    env_file:
+      - .env
+    expose:
+      - "5000"
+
+  nginx:
+    image: nginx:latest
+    container_name: nginx_chatbot
+    ports:
+      - "8080:80"
+    volumes:
+      - ./nginx.conf:/etc/nginx/conf.d/default.conf
+      - ./static:/app/static
+    depends_on:
+      - flask
+
