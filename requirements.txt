@@ -1,3 +1,4 @@
 flask
 requests
-openai
+gunicorn
+openai>=1.0.0
