@@ -12,7 +12,7 @@ if os.getenv("APPLICATIONINSIGHTS_CONNECTION_STRING"):
         print("[INFO] Azure Monitor exporter not installed. Skipping App Insights setup.")
 
 app = Flask(__name__, template_folder="templates")
-CORS(app)  # Optional: Enable CORS
+CORS(app)
 
 # Load environment variables
 OPENAI_API_KEY = os.getenv("AZURE_OPENAI_KEY")
@@ -23,7 +23,7 @@ WEBHOOK_URL = os.getenv("WEBHOOK_URL")
 
 @app.route("/", methods=["GET"])
 def index():
-    return render_template("index.html")  # Serve your chatbot front-end
+    return render_template("index.html")
 
 @app.route("/send_message", methods=["POST"])
 def send_message():
@@ -31,7 +31,7 @@ def send_message():
     user_message = data.get("message", "")
 
     if not user_message:
-        return jsonify({"error": "Missing 'message' in request"}), 400
+        return jsonify({"response": "⚠️ No message received."}), 400
 
     headers = {
         "Content-Type": "application/json",
@@ -58,7 +58,8 @@ def send_message():
         answer = result["choices"][0]["message"]["content"]
         return jsonify({"response": answer})
     except requests.exceptions.RequestException as e:
-        return jsonify({"error": str(e)}), 500
+        print("🛑 Error in /send_message:", str(e))  # <-- This will show up in your Azure log
+        return jsonify({"response": "Sorry, there was an error."}), 500
 
 @app.route("/summarize_session", methods=["POST"])
 def summarize_session():
@@ -66,7 +67,7 @@ def summarize_session():
     messages = data.get("messages", [])
 
     if not isinstance(messages, list):
-        return jsonify({"error": "'messages' should be a list"}), 400
+        return jsonify({"summary": "Invalid format. 'messages' should be a list."}), 400
 
     summary_prompt = "Summarize this chat:\n\n" + "\n".join(
         f"{m['role'].capitalize()}: {m['content']}" for m in messages
@@ -94,7 +95,8 @@ def summarize_session():
         summary = response.json()["choices"][0]["message"]["content"]
         return jsonify({"summary": summary})
     except requests.exceptions.RequestException as e:
-        return jsonify({"error": str(e)}), 500
+        print("🛑 Error in /summarize_session:", str(e))
+        return jsonify({"summary": "Sorry, we couldn't generate a summary."}), 500
 
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 8000))
