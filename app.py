@@ -8,7 +8,7 @@ if os.getenv("APPLICATIONINSIGHTS_CONNECTION_STRING"):
         from azure.monitor.opentelemetry import configure_azure_monitor
         configure_azure_monitor()
     except ImportError:
-        print("[INFO] Azure Monitor exporter not installed. Skipping App Insights setup.")
+        print("[INFO] Azure Monitor not installed. Skipping App Insights setup.")
 
 app = Flask(__name__)
 
@@ -38,8 +38,7 @@ def send_message():
         "top_p": 0.95,
         "frequency_penalty": 0,
         "presence_penalty": 0,
-        "max_tokens": 800,
-        "stop": None
+        "max_tokens": 800
     }
 
     try:
@@ -91,6 +90,7 @@ def summarize_session():
     except requests.exceptions.RequestException as e:
         return jsonify({"error": str(e)}), 500
 
+# Required for Azure App Service container deployment
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 8000))
     app.run(host="0.0.0.0", port=port)
