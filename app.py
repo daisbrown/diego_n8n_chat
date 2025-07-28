@@ -6,16 +6,25 @@ from flask import Flask, render_template, request, jsonify
 app = Flask(__name__)
 
 # Required environment variables
-try:
-    WEBHOOK_URL = os.environ['WEBHOOK_URL']
-    AZURE_OPENAI_KEY = os.environ['AZURE_OPENAI_KEY']
-    AZURE_OPENAI_ENDPOINT = os.environ['AZURE_OPENAI_ENDPOINT']
-    AZURE_OPENAI_API_VERSION = os.environ['AZURE_OPENAI_API_VERSION']
-    AZURE_DEPLOYMENT_ID = os.environ['AZURE_DEPLOYMENT_ID']
-except KeyError as e:
-    raise RuntimeError(f"Missing required environment variable: {e.args[0]}")
+required_env_vars = [
+    'WEBHOOK_URL',
+    'AZURE_OPENAI_KEY',
+    'AZURE_OPENAI_ENDPOINT',
+    'AZURE_OPENAI_API_VERSION',
+    'AZURE_DEPLOYMENT_ID'
+]
 
-# Azure OpenAI configuration for SDK >= 1.0.0
+missing_vars = [var for var in required_env_vars if var not in os.environ]
+if missing_vars:
+    raise RuntimeError(f"Missing required environment variables: {', '.join(missing_vars)}")
+
+WEBHOOK_URL = os.environ['WEBHOOK_URL']
+AZURE_OPENAI_KEY = os.environ['AZURE_OPENAI_KEY']
+AZURE_OPENAI_ENDPOINT = os.environ['AZURE_OPENAI_ENDPOINT']
+AZURE_OPENAI_API_VERSION = os.environ['AZURE_OPENAI_API_VERSION']
+AZURE_DEPLOYMENT_ID = os.environ['AZURE_DEPLOYMENT_ID']
+
+# Azure OpenAI SDK config
 openai.api_type = "azure"
 openai.api_key = AZURE_OPENAI_KEY
 openai.api_base = AZURE_OPENAI_ENDPOINT
@@ -41,13 +50,8 @@ def send_message():
             verify=False
         )
         response.raise_for_status()
-        print("Webhook raw response:", response.text)
-
-        try:
-            json_response = response.json()
-            bot_reply = json_response.get('output', 'No reply from webhook.')
-        except ValueError:
-            bot_reply = "Webhook error: Empty or non-JSON response"
+        json_response = response.json()
+        bot_reply = json_response.get('output', 'No reply from webhook.')
     except Exception as e:
         bot_reply = f"Webhook error: {str(e)}"
 
@@ -74,5 +78,4 @@ def summarize_session():
         return jsonify({"summary": f"OpenAI error: {str(e)}"}), 500
 
 if __name__ == '__main__':
-    port = int(os.environ.get("PORT", 8080))  # Azure will inject PORT
-    app.run(host='0.0.0.0', port=port)
+    app.run(host='0.0.0.0', port=5000)
