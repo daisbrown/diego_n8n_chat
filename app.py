@@ -2,13 +2,13 @@ import os
 from flask import Flask, request, jsonify
 import requests
 
-# Optional App Insights (non-blocking)
+# Optional App Insights setup
 if os.getenv("APPLICATIONINSIGHTS_CONNECTION_STRING"):
     try:
         from azure.monitor.opentelemetry import configure_azure_monitor
         configure_azure_monitor()
     except ImportError:
-        print("[INFO] Azure Monitor not installed. Skipping App Insights setup.")
+        print("[INFO] Azure Monitor exporter not installed. Skipping App Insights setup.")
 
 app = Flask(__name__)
 
@@ -18,6 +18,10 @@ OPENAI_ENDPOINT = os.getenv("AZURE_OPENAI_ENDPOINT")
 DEPLOYMENT_ID = os.getenv("AZURE_DEPLOYMENT_ID")
 API_VERSION = os.getenv("AZURE_OPENAI_API_VERSION", "2024-05-01-preview")
 WEBHOOK_URL = os.getenv("WEBHOOK_URL")
+
+@app.route("/", methods=["GET"])
+def index():
+    return "✅ Flask Chatbot is running."
 
 @app.route("/send_message", methods=["POST"])
 def send_message():
@@ -90,7 +94,6 @@ def summarize_session():
     except requests.exceptions.RequestException as e:
         return jsonify({"error": str(e)}), 500
 
-# Required for Azure App Service container deployment
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 8000))
     app.run(host="0.0.0.0", port=port)
