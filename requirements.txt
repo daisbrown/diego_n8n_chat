@@ -1,7 +1,9 @@
 flask
 requests
-gunicorn
-openai>=1.0.0
-opencensus-ext-azure
-opencensus-ext-requests
-opencensus-ext-flask
+openai
+opentelemetry-sdk
+opentelemetry-exporter-azure-monitor
+opentelemetry-instrumentation
+opentelemetry-instrumentation-flask
+opentelemetry-instrumentation-requests
+
