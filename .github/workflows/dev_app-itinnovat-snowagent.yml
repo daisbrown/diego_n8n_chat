@@ -1,0 +1,64 @@
+# Docs for the Azure Web Apps Deploy action: https://github.com/Azure/webapps-deploy
+# More GitHub Actions for Azure: https://github.com/Azure/actions
+
+name: Build and deploy container app to Azure Web App - app-itinnovat-snowagent
+
+on:
+  push:
+    branches:
+      - dev
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read #This is required for actions/checkout
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v2
+
+      - name: Log in to container registry
+        uses: docker/login-action@v2
+        with:
+          registry: servicenowapp.azurecr.io/
+          username: ${{ secrets.AZUREAPPSERVICE_CONTAINERUSERNAME_12ACC5DFA37E46F6BD256B5BB9B503BC }}
+          password: ${{ secrets.AZUREAPPSERVICE_CONTAINERPASSWORD_9FF92DB25FE74C9D90BBBD890340D11F }}
+
+      - name: Build and push container image to registry
+        uses: docker/build-push-action@v3
+        with:
+          context: .
+          push: true
+          tags: servicenowapp.azurecr.io/${{ secrets.AZUREAPPSERVICE_CONTAINERUSERNAME_12ACC5DFA37E46F6BD256B5BB9B503BC }}/chatbot/diego:${{ github.sha }}
+          file: ./Dockerfile
+
+  deploy:
+    runs-on: ubuntu-latest
+    permissions:
+      id-token: write #This is required for requesting the JWT
+      contents: read #This is required for actions/checkout
+
+    needs: build
+    
+
+    steps:
+      
+      - name: Login to Azure
+        uses: azure/login@v2
+        with:
+          client-id: ${{ secrets.AZUREAPPSERVICE_CLIENTID_82FFB2E9E13E454F8ACEC04B9C659D6A }}
+          tenant-id: ${{ secrets.AZUREAPPSERVICE_TENANTID_F0E5D524EE744CF38E972F76C610A4ED }}
+          subscription-id: ${{ secrets.AZUREAPPSERVICE_SUBSCRIPTIONID_4BB2154769974A009F7068E6A44D5DCB }}
+
+      - name: Deploy to Azure Web App
+        id: deploy-to-webapp
+        uses: azure/webapps-deploy@v2
+        with:
+          app-name: 'app-itinnovat-snowagent'
+          slot-name: 'Production'
+          images: 'servicenowapp.azurecr.io/${{ secrets.AZUREAPPSERVICE_CONTAINERUSERNAME_12ACC5DFA37E46F6BD256B5BB9B503BC }}/chatbot/diego:${{ github.sha }}'
+          
