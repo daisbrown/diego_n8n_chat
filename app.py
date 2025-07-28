@@ -1,68 +1,96 @@
-from flask import Flask, request, jsonify, session
 import os
+from flask import Flask, request, jsonify
 import requests
-from flask_cors import CORS
-from azure.monitor.opentelemetry import configure_azure_monitor
 
-# Enable App Insights if the connection string exists
+# Optional App Insights (non-blocking)
 if os.getenv("APPLICATIONINSIGHTS_CONNECTION_STRING"):
-    configure_azure_monitor()
+    try:
+        from azure.monitor.opentelemetry import configure_azure_monitor
+        configure_azure_monitor()
+    except ImportError:
+        print("[INFO] Azure Monitor exporter not installed. Skipping App Insights setup.")
 
 app = Flask(__name__)
-CORS(app)
-app.secret_key = os.getenv("FLASK_SECRET_KEY", "a_very_secret_key")
 
-# Azure OpenAI config
-AZURE_OPENAI_KEY = os.getenv("AZURE_OPENAI_KEY")
-AZURE_OPENAI_ENDPOINT = os.getenv("AZURE_OPENAI_ENDPOINT")
-AZURE_OPENAI_API_VERSION = os.getenv("AZURE_OPENAI_API_VERSION")
-DEPLOYMENT_NAME = os.getenv("AZURE_OPENAI_DEPLOYMENT", "gpt-4o")  # fallback
-
-@app.route("/")
-def index():
-    return jsonify({"message": "Chat API is running."})
+# Load environment variables
+OPENAI_API_KEY = os.getenv("AZURE_OPENAI_KEY")
+OPENAI_ENDPOINT = os.getenv("AZURE_OPENAI_ENDPOINT")
+DEPLOYMENT_ID = os.getenv("AZURE_DEPLOYMENT_ID")
+API_VERSION = os.getenv("AZURE_OPENAI_API_VERSION", "2024-05-01-preview")
+WEBHOOK_URL = os.getenv("WEBHOOK_URL")
 
 @app.route("/send_message", methods=["POST"])
 def send_message():
-    data = request.json
-    user_input = data.get("message", "")
+    data = request.get_json()
+    user_message = data.get("message", "")
 
-    if "chat_history" not in session:
-        session["chat_history"] = []
+    if not user_message:
+        return jsonify({"error": "Missing 'message' in request"}), 400
 
-    session["chat_history"].append({"role": "user", "content": user_input})
-
-    url = f"{AZURE_OPENAI_ENDPOINT}/openai/deployments/{DEPLOYMENT_NAME}/chat/completions?api-version={AZURE_OPENAI_API_VERSION}"
     headers = {
         "Content-Type": "application/json",
-        "api-key": AZURE_OPENAI_KEY
+        "api-key": OPENAI_API_KEY
     }
-    payload = {
-        "messages": session["chat_history"],
-        "temperature": 0.7
+
+    body = {
+        "messages": [{"role": "user", "content": user_message}],
+        "temperature": 0.7,
+        "top_p": 0.95,
+        "frequency_penalty": 0,
+        "presence_penalty": 0,
+        "max_tokens": 800,
+        "stop": None
     }
 
     try:
-        res = requests.post(url, headers=headers, json=payload)
-        res.raise_for_status()
-        reply = res.json()["choices"][0]["message"]["content"]
-        session["chat_history"].append({"role": "assistant", "content": reply})
-        return jsonify({"reply": reply})
-    except Exception as e:
+        response = requests.post(
+            f"{OPENAI_ENDPOINT}/openai/deployments/{DEPLOYMENT_ID}/chat/completions?api-version={API_VERSION}",
+            headers=headers,
+            json=body
+        )
+        response.raise_for_status()
+        result = response.json()
+        answer = result["choices"][0]["message"]["content"]
+        return jsonify({"response": answer})
+    except requests.exceptions.RequestException as e:
         return jsonify({"error": str(e)}), 500
 
-@app.route("/summarize_session", methods=["GET"])
+@app.route("/summarize_session", methods=["POST"])
 def summarize_session():
-    if "chat_history" not in session or not session["chat_history"]:
-        return jsonify({"summary": "No session history to summarize."})
+    data = request.get_json()
+    messages = data.get("messages", [])
 
-    session["chat_history"].append({"role": "user", "content": "Summarize this session"})
-    return send_message()
+    if not isinstance(messages, list):
+        return jsonify({"error": "'messages' should be a list"}), 400
 
-@app.route("/reset", methods=["POST"])
-def reset():
-    session.clear()
-    return jsonify({"message": "Session reset."})
+    summary_prompt = "Summarize this chat:\n\n" + "\n".join(
+        f"{m['role'].capitalize()}: {m['content']}" for m in messages
+    )
+
+    headers = {
+        "Content-Type": "application/json",
+        "api-key": OPENAI_API_KEY
+    }
+
+    body = {
+        "messages": [{"role": "user", "content": summary_prompt}],
+        "temperature": 0.5,
+        "top_p": 0.9,
+        "max_tokens": 300
+    }
+
+    try:
+        response = requests.post(
+            f"{OPENAI_ENDPOINT}/openai/deployments/{DEPLOYMENT_ID}/chat/completions?api-version={API_VERSION}",
+            headers=headers,
+            json=body
+        )
+        response.raise_for_status()
+        summary = response.json()["choices"][0]["message"]["content"]
+        return jsonify({"summary": summary})
+    except requests.exceptions.RequestException as e:
+        return jsonify({"error": str(e)}), 500
 
 if __name__ == "__main__":
-    app.run(host="0.0.0.0", port=int(os.environ.get("PORT", 5000)))
+    port = int(os.environ.get("PORT", 8000))
+    app.run(host="0.0.0.0", port=port)
