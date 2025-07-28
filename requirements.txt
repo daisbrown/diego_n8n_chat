@@ -2,3 +2,6 @@ flask
 requests
 gunicorn
 openai>=1.0.0
+opencensus-ext-azure
+opencensus-ext-requests
+opencensus-ext-flask
