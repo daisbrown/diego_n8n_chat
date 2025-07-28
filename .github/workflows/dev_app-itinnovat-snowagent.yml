@@ -25,15 +25,15 @@ jobs:
         uses: docker/login-action@v2
         with:
           registry: servicenowapp.azurecr.io/
-          username: ${{ secrets.AZUREAPPSERVICE_CONTAINERUSERNAME_4D40C4C62F6D4DEF93B76C27A8C0C7B9 }}
-          password: ${{ secrets.AZUREAPPSERVICE_CONTAINERPASSWORD_818C412C1AB5422980B92C7266BCBC72 }}
+          username: ${{ secrets.AZUREAPPSERVICE_CONTAINERUSERNAME_8C3C3A5539234E25B39E646AB484AD7C }}
+          password: ${{ secrets.AZUREAPPSERVICE_CONTAINERPASSWORD_E2BF37913B79407B8170F24B4D63162F }}
 
       - name: Build and push container image to registry
         uses: docker/build-push-action@v3
         with:
           context: .
           push: true
-          tags: servicenowapp.azurecr.io/${{ secrets.AZUREAPPSERVICE_CONTAINERUSERNAME_4D40C4C62F6D4DEF93B76C27A8C0C7B9 }}/chatbot/diego:${{ github.sha }}
+          tags: servicenowapp.azurecr.io/${{ secrets.AZUREAPPSERVICE_CONTAINERUSERNAME_8C3C3A5539234E25B39E646AB484AD7C }}/chatbot/diego:${{ github.sha }}
           file: ./Dockerfile
 
   deploy:
@@ -50,9 +50,9 @@ jobs:
       - name: Login to Azure
         uses: azure/login@v2
         with:
-          client-id: ${{ secrets.AZUREAPPSERVICE_CLIENTID_3F8B1BF64DE548A89173DEF0FD78A4C2 }}
-          tenant-id: ${{ secrets.AZUREAPPSERVICE_TENANTID_3908450EF2594440BE4877DC443652C0 }}
-          subscription-id: ${{ secrets.AZUREAPPSERVICE_SUBSCRIPTIONID_8C01F455E9594B98B1E477BCE89D2CEF }}
+          client-id: ${{ secrets.AZUREAPPSERVICE_CLIENTID_4F853A250F8B412C9B477CE9CBA915E6 }}
+          tenant-id: ${{ secrets.AZUREAPPSERVICE_TENANTID_79D0E131B35846DD88AE2CEF5D05C518 }}
+          subscription-id: ${{ secrets.AZUREAPPSERVICE_SUBSCRIPTIONID_F78BA3999AF74081AC089C657C61E569 }}
 
       - name: Deploy to Azure Web App
         id: deploy-to-webapp
@@ -60,5 +60,5 @@ jobs:
         with:
           app-name: 'app-itinnovat-snowagent'
           slot-name: 'Production'
-          images: 'servicenowapp.azurecr.io/${{ secrets.AZUREAPPSERVICE_CONTAINERUSERNAME_4D40C4C62F6D4DEF93B76C27A8C0C7B9 }}/chatbot/diego:${{ github.sha }}'
+          images: 'servicenowapp.azurecr.io/${{ secrets.AZUREAPPSERVICE_CONTAINERUSERNAME_8C3C3A5539234E25B39E646AB484AD7C }}/chatbot/diego:${{ github.sha }}'
           
