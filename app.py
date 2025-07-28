@@ -1,103 +1,66 @@
-import os
-import logging
-import requests
+from flask import Flask, request, jsonify, session
 import openai
-from flask import Flask, render_template, request, jsonify
+import os
+from flask_cors import CORS
+from azure.monitor.opentelemetry import configure_azure_monitor
 
-# --- OpenTelemetry Setup ---
-from opentelemetry import trace
-from opentelemetry.sdk.resources import Resource
-from opentelemetry.sdk.trace import TracerProvider
-from opentelemetry.sdk.trace.export import BatchSpanProcessor
-from opentelemetry.exporter.azure.monitor import AzureMonitorTraceExporter
-from opentelemetry.instrumentation.flask import FlaskInstrumentor
-from opentelemetry.instrumentation.requests import RequestsInstrumentor
+# Enable Application Insights if the connection string is set
+if os.getenv("APPLICATIONINSIGHTS_CONNECTION_STRING"):
+    configure_azure_monitor()
 
-# --- Azure Monitor Resource Init ---
-resource = Resource.create({
-    "service.name": "app-itinnovate-snowagent",
-})
-
-# --- Tracer and Exporter ---
-trace.set_tracer_provider(TracerProvider(resource=resource))
-tracer = trace.get_tracer(__name__)
-
-exporter = AzureMonitorTraceExporter.from_connection_string(
-    os.environ.get("APPLICATIONINSIGHTS_CONNECTION_STRING", "")
-)
-
-trace.get_tracer_provider().add_span_processor(
-    BatchSpanProcessor(exporter)
-)
-
-# --- App Init ---
 app = Flask(__name__)
-FlaskInstrumentor().instrument_app(app)
-RequestsInstrumentor().instrument()
+CORS(app)
 
-# --- Required Environment Variables ---
-WEBHOOK_URL = os.environ['WEBHOOK_URL']
-AZURE_OPENAI_KEY = os.environ['AZURE_OPENAI_KEY']
-AZURE_OPENAI_ENDPOINT = os.environ['AZURE_OPENAI_ENDPOINT']
-AZURE_OPENAI_API_VERSION = os.environ['AZURE_OPENAI_API_VERSION']
-AZURE_DEPLOYMENT_ID = os.environ['AZURE_DEPLOYMENT_ID']
+# Secret key for Flask session management
+app.secret_key = os.getenv("FLASK_SECRET_KEY", "a_very_secret_key")
 
-# --- Azure OpenAI Config ---
-openai.api_type = "azure"
-openai.api_key = AZURE_OPENAI_KEY
-openai.api_base = AZURE_OPENAI_ENDPOINT
-openai.api_version = AZURE_OPENAI_API_VERSION
+# OpenAI API key from environment
+openai.api_key = os.getenv("OPENAI_API_KEY")
 
-@app.route('/')
+@app.route("/")
 def index():
-    return render_template('index.html')
+    return jsonify({"message": "Chat API is running."})
 
-@app.route('/send_message', methods=['POST'])
+@app.route("/send_message", methods=["POST"])
 def send_message():
     data = request.json
-    if isinstance(data, list) and len(data) > 0:
-        data = data[0]
+    user_message = data.get("message", "")
+    
+    if "chat_history" not in session:
+        session["chat_history"] = []
 
-    user_message = data.get('message')
-    session_id = data.get('sessionid')
+    session["chat_history"].append({"role": "user", "content": user_message})
 
-    with tracer.start_as_current_span("send_message"):
-        try:
-            response = requests.post(
-                WEBHOOK_URL,
-                json={'message': user_message, 'sessionid': session_id},
-                verify=False
-            )
-            response.raise_for_status()
-            try:
-                json_response = response.json()
-                bot_reply = json_response.get('output', 'No reply from webhook.')
-            except ValueError:
-                bot_reply = "Webhook error: Empty or non-JSON response"
-        except Exception as e:
-            bot_reply = f"Webhook error: {str(e)}"
-        return jsonify({'reply': bot_reply})
+    try:
+        response = openai.ChatCompletion.create(
+            model="gpt-4o",
+            messages=session["chat_history"]
+        )
+        reply = response["choices"][0]["message"]["content"]
+        session["chat_history"].append({"role": "assistant", "content": reply})
+        return jsonify({"reply": reply})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
 
-@app.route('/summarize_session', methods=['POST'])
+@app.route("/summarize_session", methods=["GET"])
 def summarize_session():
-    data = request.json
-    messages = data.get('messages', [])
+    if "chat_history" not in session or not session["chat_history"]:
+        return jsonify({"summary": "No session history to summarize."})
 
-    if not messages:
-        return jsonify({"summary": "No messages to summarize."}), 400
+    try:
+        response = openai.ChatCompletion.create(
+            model="gpt-4o",
+            messages=session["chat_history"] + [{"role": "user", "content": "Summarize this session"}]
+        )
+        summary = response["choices"][0]["message"]["content"]
+        return jsonify({"summary": summary})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
 
-    prompt = "Summarize the following chat session in one short sentence for a sidebar label:\n" + "\n".join(messages)
+@app.route("/reset", methods=["POST"])
+def reset_session():
+    session.clear()
+    return jsonify({"message": "Session reset."})
 
-    with tracer.start_as_current_span("summarize_session"):
-        try:
-            response = openai.chat.completions.create(
-                model=AZURE_DEPLOYMENT_ID,
-                messages=[{"role": "user", "content": prompt}]
-            )
-            summary = response.choices[0].message.content.strip()
-            return jsonify({"summary": summary})
-        except Exception as e:
-            return jsonify({"summary": f"OpenAI error: {str(e)}"}), 500
-
-if __name__ == '__main__':
-    app.run(host='0.0.0.0', port=5000)
+if __name__ == "__main__":
+    app.run(host="0.0.0.0", port=int(os.environ.get("PORT", 5000)))
