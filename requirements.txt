@@ -2,8 +2,4 @@ flask
 requests
 openai
 opentelemetry-sdk
-opentelemetry-exporter-azure-monitor
-opentelemetry-instrumentation
-opentelemetry-instrumentation-flask
-opentelemetry-instrumentation-requests
-
+opentelemetry-exporter-azure-monitor-distro
