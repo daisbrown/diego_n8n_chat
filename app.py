@@ -41,7 +41,7 @@ def send_message():
             verify=False
         )
         response.raise_for_status()
-        print("Webhook raw response:", response.text)  # Debug webhook output
+        print("Webhook raw response:", response.text)
 
         try:
             json_response = response.json()
@@ -65,7 +65,7 @@ def summarize_session():
 
     try:
         response = openai.chat.completions.create(
-            model=AZURE_DEPLOYMENT_ID,  # Use deployment name from Azure
+            model=AZURE_DEPLOYMENT_ID,
             messages=[{"role": "user", "content": prompt}]
         )
         summary = response.choices[0].message.content.strip()
@@ -74,5 +74,5 @@ def summarize_session():
         return jsonify({"summary": f"OpenAI error: {str(e)}"}), 500
 
 if __name__ == '__main__':
-    app.run(host='0.0.0.0', port=5000)
-
+    port = int(os.environ.get("PORT", 8080))  # Azure will inject PORT
+    app.run(host='0.0.0.0', port=port)
