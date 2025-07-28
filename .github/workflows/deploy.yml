@@ -30,4 +30,3 @@ jobs:
           app-name: ${{ secrets.AZURE_WEBAPP_NAME }}
           slot-name: Production
           package: .
-
