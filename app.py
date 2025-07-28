@@ -1,5 +1,6 @@
 import os
-from flask import Flask, request, jsonify
+from flask import Flask, request, jsonify, render_template
+from flask_cors import CORS
 import requests
 
 # Optional App Insights setup
@@ -10,7 +11,8 @@ if os.getenv("APPLICATIONINSIGHTS_CONNECTION_STRING"):
     except ImportError:
         print("[INFO] Azure Monitor exporter not installed. Skipping App Insights setup.")
 
-app = Flask(__name__)
+app = Flask(__name__, template_folder="templates")
+CORS(app)  # Optional: Enable CORS
 
 # Load environment variables
 OPENAI_API_KEY = os.getenv("AZURE_OPENAI_KEY")
@@ -21,7 +23,7 @@ WEBHOOK_URL = os.getenv("WEBHOOK_URL")
 
 @app.route("/", methods=["GET"])
 def index():
-    return "✅ Flask Chatbot is running."
+    return render_template("index.html")  # Serve your chatbot front-end
 
 @app.route("/send_message", methods=["POST"])
 def send_message():
