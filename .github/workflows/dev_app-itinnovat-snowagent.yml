@@ -1,7 +1,8 @@
 # Docs for the Azure Web Apps Deploy action: https://github.com/Azure/webapps-deploy
 # More GitHub Actions for Azure: https://github.com/Azure/actions
+# More info on Python, GitHub Actions, and Azure App Service: https://aka.ms/python-webapps-actions
 
-name: Build and deploy container app to Azure Web App - app-itinnovat-snowagent
+name: Build and deploy Python app to Azure Web App - app-itinnovat-snowagent
 
 on:
   push:
@@ -18,47 +19,53 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v2
-
-      - name: Log in to container registry
-        uses: docker/login-action@v2
+      - name: Set up Python version
+        uses: actions/setup-python@v5
         with:
-          registry: servicenowapp.azurecr.io/
-          username: ${{ secrets.AZUREAPPSERVICE_CONTAINERUSERNAME_12ACC5DFA37E46F6BD256B5BB9B503BC }}
-          password: ${{ secrets.AZUREAPPSERVICE_CONTAINERPASSWORD_9FF92DB25FE74C9D90BBBD890340D11F }}
+          python-version: '3.12'
 
-      - name: Build and push container image to registry
-        uses: docker/build-push-action@v3
+      - name: Create and start virtual environment
+        run: |
+          python -m venv venv
+          source venv/bin/activate
+      
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+        
+      # Optional: Add step to run tests here (PyTest, Django test suites, etc.)
+
+      - name: Upload artifact for deployment jobs
+        uses: actions/upload-artifact@v4
         with:
-          context: .
-          push: true
-          tags: servicenowapp.azurecr.io/${{ secrets.AZUREAPPSERVICE_CONTAINERUSERNAME_12ACC5DFA37E46F6BD256B5BB9B503BC }}/chatbot/diego:${{ github.sha }}
-          file: ./Dockerfile
+          name: python-app
+          path: |
+            .
+            !venv/
 
   deploy:
     runs-on: ubuntu-latest
+    needs: build
     permissions:
       id-token: write #This is required for requesting the JWT
       contents: read #This is required for actions/checkout
 
-    needs: build
-    
-
     steps:
+      - name: Download artifact from build job
+        uses: actions/download-artifact@v4
+        with:
+          name: python-app
       
       - name: Login to Azure
         uses: azure/login@v2
         with:
-          client-id: ${{ secrets.AZUREAPPSERVICE_CLIENTID_82FFB2E9E13E454F8ACEC04B9C659D6A }}
-          tenant-id: ${{ secrets.AZUREAPPSERVICE_TENANTID_F0E5D524EE744CF38E972F76C610A4ED }}
-          subscription-id: ${{ secrets.AZUREAPPSERVICE_SUBSCRIPTIONID_4BB2154769974A009F7068E6A44D5DCB }}
+          client-id: ${{ secrets.AZUREAPPSERVICE_CLIENTID_66DBF252E03A4FED920F8BC69CAC1C01 }}
+          tenant-id: ${{ secrets.AZUREAPPSERVICE_TENANTID_569BF69F2DAF4AF8BFC65ACA53CA6041 }}
+          subscription-id: ${{ secrets.AZUREAPPSERVICE_SUBSCRIPTIONID_D64A69A442614B4FA54ED8A901A62721 }}
 
-      - name: Deploy to Azure Web App
+      - name: 'Deploy to Azure Web App'
+        uses: azure/webapps-deploy@v3
         id: deploy-to-webapp
-        uses: azure/webapps-deploy@v2
         with:
           app-name: 'app-itinnovat-snowagent'
           slot-name: 'Production'
-          images: 'servicenowapp.azurecr.io/${{ secrets.AZUREAPPSERVICE_CONTAINERUSERNAME_12ACC5DFA37E46F6BD256B5BB9B503BC }}/chatbot/diego:${{ github.sha }}'
           
