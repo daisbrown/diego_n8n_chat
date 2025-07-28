@@ -3,3 +3,4 @@ requests
 openai
 opentelemetry-sdk
 azure-monitor-opentelemetry
+flask_cors
