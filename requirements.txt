@@ -2,4 +2,4 @@ flask
 requests
 openai
 opentelemetry-sdk
-azure-monitor-opentelemetry-exporter
+azure-monitor-opentelemetry
